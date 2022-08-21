@@ -12,6 +12,7 @@
 #import "Tweaks/YouTubeHeader/YTIPivotBarRenderer.h"
 #import "Tweaks/YouTubeHeader/YTIBrowseRequest.h"
 #import "Tweaks/YouTubeHeader/YTCommonColorPalette.h"
+#import "Tweaks/YouTubeHeader/YTColorPalette.h"
 #import "Tweaks/YouTubeHeader/ASCollectionView.h"
 #import "Tweaks/YouTubeHeader/YTPlayerOverlay.h"
 #import "Tweaks/YouTubeHeader/YTPlayerOverlayProvider.h"
@@ -77,6 +78,11 @@ BOOL hidePaidPromotionCard() {
 %hook YTIPlaylistPanelVideoRenderer 
 %new 
 - (BOOL)canReorder { return YES; }
+%end
+
+// Skips content warning before playing *some videos - @PoomSmart
+%hook YTPlayabilityResolutionUserActionUIController
+- (void)showConfirmAlert { [self confirmAlertDidPressConfirm]; }
 %end
 
 // YTMiniPlayerEnabler: https://github.com/level3tjg/YTMiniplayerEnabler/
@@ -211,6 +217,7 @@ BOOL hidePaidPromotionCard() {
 // YouRememberCaption: https://poomsmart.github.io/repo/depictions/youremembercaption.html
 %hook YTColdConfig
 - (BOOL)respectDeviceCaptionSetting { return NO; }
+- (BOOL)shouldUseAppThemeSetting { return YES; } // v16.xx
 %end
 
 // NOYTPremium - https://github.com/PoomSmart/NoYTPremium/
@@ -240,9 +247,17 @@ BOOL hidePaidPromotionCard() {
 - (void)showSurveyWithRenderer:(id)arg1 surveyParentResponder:(id)arg2 {}
 %end
 
-// Enable Shorts scroll bar - @level3tjg - https://reddit.com/r/jailbreak/comments/v29yvk/_/iasl1l0/
+// Enable Shorts scroll bar - @PoomSmart
 %hook YTReelPlayerViewController
-- (BOOL)shouldEnablePlayerBar { return YES; }
+- (BOOL)shouldAlwaysEnablePlayerBar { return YES; }
+%end
+
+%hook YTInlinePlayerBarContainerView
+- (void)setUserInteractionEnabled:(BOOL)enabled { %orig(YES); }
+%end
+
+%hook YTReelPlayerViewControllerSub // v16.42.3 - @level3tjg: https://reddit.com/r/jailbreak/comments/v29yvk/_/iasl1l0/
+ - (BOOL)shouldEnablePlayerBar { return YES; }
 %end
 
 // Workaround for issue #54
@@ -359,6 +374,23 @@ BOOL hidePaidPromotionCard() {
 }
 %end
 
+// Fix "You can't sign in to this app because Google can't confirm that it's safe" warning when signing in. by julioverne & PoomSmart
+// https://gist.github.com/PoomSmart/ef5b172fd4c5371764e027bea2613f93
+// https://github.com/qnblackcat/uYouPlus/pull/398
+%hook SSOService
++ (id)fetcherWithRequest:(NSMutableURLRequest *)request configuration:(id)configuration {
+    if ([request isKindOfClass:[NSMutableURLRequest class]] && request.HTTPBody) {
+        NSError *error = nil;
+        NSMutableDictionary *body = [NSJSONSerialization JSONObjectWithData:request.HTTPBody options:NSJSONReadingMutableContainers error:&error];
+        if (!error && [body isKindOfClass:[NSMutableDictionary class]]) {
+            [body removeObjectForKey:@"device_challenge_request"];
+            request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:kNilOptions error:&error];
+        }
+    }
+    return %orig;
+}
+%end
+
 # pragma mark - OLED dark mode by BandarHL
 UIColor* raisedColor = [UIColor colorWithRed:0.035 green:0.035 blue:0.035 alpha:1.0];
 %group gOLED
@@ -384,6 +416,39 @@ UIColor* raisedColor = [UIColor colorWithRed:0.035 green:0.035 blue:0.035 alpha:
 - (UIColor *)raisedBackground {
     if (self.pageStyle == 1) {
         return [UIColor blackColor];
+    }
+        return %orig;
+}
+- (UIColor *)staticBrandBlack {
+    if (self.pageStyle == 1) {
+        return [UIColor blackColor];
+    }
+        return %orig;
+}
+- (UIColor *)generalBackgroundA {
+    if (self.pageStyle == 1) {
+        return [UIColor blackColor];
+    }
+        return %orig;
+}
+%end
+
+%hook YTColorPalette // v16.42.3
+- (UIColor *)brandBackgroundSolid {
+    if (self.pageStyle == 1) {
+        return [UIColor blackColor];
+    }
+        return %orig;
+}
+- (UIColor *)brandBackgroundPrimary {
+    if (self.pageStyle == 1) {
+        return [UIColor blackColor];
+    }
+        return %orig;
+}
+- (UIColor *)brandBackgroundSecondary {
+    if (self.pageStyle == 1) {
+        return [[UIColor blackColor] colorWithAlphaComponent:0.9];
     }
         return %orig;
 }
